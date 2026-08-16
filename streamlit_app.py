@@ -25,12 +25,11 @@ with col2:
 
 product_type = st.selectbox("Product Category", ["Perishables", "Non Perishables"])
 
-# API URL (update if running in Docker or Codespaces)
-api_url = st.text_input("API URL", value="http://127.0.0.1:5000/predict")
+# API URL
+api_url = st.text_input("API URL", value="http://172.17.0.2:5000/predict")
 
 # Predict button
 if st.button("Predict Sales"):
-    # Prepare payload
     payload = {
         "Product_Weight": product_weight,
         "Product_Sugar_Content": sugar_content,
@@ -39,17 +38,23 @@ if st.button("Predict Sales"):
         "Store_Size": store_size,
         "Store_Location_City_Type": city_type,
         "Store_Type": store_type,
-        "Product_Id_char": "FD",  # Placeholder for Product_Id_char (not used in model)
+        "Product_Id_char": "FD",
         "Store_Age_Years": store_age,
         "Product_Type_Category": product_type
     }
 
     try:
-        response = requests.post(api_url, json=payload)
+        response = requests.post(api_url, json=payload, timeout=10)
+        st.write(f"Status Code: {response.status_code}")
+        st.write(f"Response Text: {response.text[:1000]}")  # Show raw response
+
         if response.status_code == 200:
             prediction = response.json().get("predicted_sales")
-            st.success(f"✅ Predicted Sales: **${prediction:,.2f}**")
+            st.success(f"Predicted Sales: **${prediction:,.2f}**")
         else:
-            st.error(f"❌ Error: {response.status_code} - {response.text}")
+            st.error(f"Error {response.status_code}: {response.text}")
     except requests.exceptions.ConnectionError:
-        st.error("❌ Could not connect to API. Make sure the Flask server is running at the specified URL.")
+        st.error("Could not connect to API. Make sure the Flask server is running.")
+    except requests.exceptions.JSONDecodeError as e:
+        st.error(f"JSON Decode Error: {e}")
+        st.text(f"Response text: {response.text[:500]}")
