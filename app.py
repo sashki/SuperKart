@@ -40,6 +40,75 @@ def predict():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@app.route('/predictbatch', methods=['POST'])
+def predict_batch():
+    """Batch prediction endpoint that accepts CSV file upload."""
+    if model is None or scaler is None:
+        return jsonify({'error': 'Model or scaler not loaded.'}), 500
+
+    try:
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded. Use key "file".'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'Empty filename.'}), 400
+
+        # Read CSV file
+        df = pd.read_csv(file)
+        print(f"Received CSV with {len(df)} rows")
+
+        predictions = []
+        for index, row in df.iterrows():
+            record = row.to_dict()
+            processed = preprocess_input(record)
+            pred = model.predict(processed)
+            predictions.append(float(pred[0]))
+
+        return jsonify({
+            'predictions': predictions,
+            'count': len(predictions)
+        })
+
+    except Exception as e:
+        print(f"Error in /predictbatchcsv: {e}")
+        return jsonify({'error': str(e)}), 400        
+
+@app.route('/predictbatchjson', methods=['POST'])
+def predict_batch_json():
+    """
+    Accepts a JSON array of multiple product/store records.
+    Returns predictions for all records.
+    """
+    if model is None or scaler is None:
+        return jsonify({'error': 'Model or scaler not loaded.'}), 500
+
+    try:
+        # Get JSON data from request (expects a list of records)
+        batch_data = request.get_json()
+
+        # If it's a single dict, convert to list (for convenience)
+        if isinstance(batch_data, dict):
+            batch_data = [batch_data]
+
+        if not isinstance(batch_data, list):
+            return jsonify({'error': 'Expected JSON array or object.'}), 400
+
+        predictions = []
+
+        for record in batch_data:
+            # Preprocess each record
+            processed = preprocess_input(record)
+            pred = model.predict(processed)
+            predictions.append(float(pred[0]))
+
+        # Return all predictions as JSON array
+        return jsonify({'predictions': predictions})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400        
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok'})
